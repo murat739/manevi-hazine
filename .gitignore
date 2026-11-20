@@ -1,0 +1,78 @@
+# ==============================================================================
+# 1. PYTHON DERLEME, SANAL ORTAMLAR & ÖNBELLEKLER
+# ==============================================================================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+.eggs/
+build/
+dist/
+*.spec
+*.manifest
+
+.venv/
+venv/
+env/
+ENV/
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+.ipynb_checkpoints/
+
+# ==============================================================================
+# 2. STREAMLIT GİZLİ AYARLAR & ORTAM DEĞİŞKENLERİ
+# ==============================================================================
+# AUTHOR_PASSWORD gibi gizli değerler GitHub'a gitmemeli;
+# Streamlit Cloud arayüzünde Settings -> Secrets bölümüne girilir.
+.streamlit/secrets.toml
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ==============================================================================
+# 3. VERİTABANI (icerik_arsivi.db), WAL/SHM & GEÇİCİ DOSYALAR
+# ==============================================================================
+# Başlangıç kayıtları init_db() içinde oluşturulduğundan yerel DB ve
+# çalışma zamanı WAL/SHM dosyaları repoya gönderilmez.
+*.db
+*.db-wal
+*.db-shm
+*.db-journal
+*.sqlite
+*.sqlite3
+
+logs/
+*.log
+temp/
+tmp/
+outputs/
+*.xlsx
+*.xls
+*.csv
+*.pdf
+*.docx
+
+# ==============================================================================
+# 4. İŞLETİM SİSTEMİ & IDE / EDİTÖR DOSYALARI
+# ==============================================================================
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+.DS_Store
+._*
+*~
+
+.vscode/*
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+.idea/
+*.swp
+*.swo
+*.swn
