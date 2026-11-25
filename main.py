@@ -7,18 +7,11 @@ import sqlite3
 import streamlit as st
 import streamlit.components.v1 as components
 
-# Otomatik çeviri kütüphanesi (İnternet varsa yazarın metnini de tam çevirir)
-try:
-    from deep_translator import GoogleTranslator
-    HAS_TRANSLATOR = True
-except ImportError:
-    HAS_TRANSLATOR = False
-
 # ---------------------------------------------------------
 # 1. SAYFA YAPILANDIRMASI VE TEMA AYARLARI
 # ---------------------------------------------------------
 st.set_page_config(
-    page_title="Bilgi ve Hikmet Köşesi | Knowledge & Wisdom Corner",
+    page_title="Bilgi ve Hikmet Köşesi",
     page_icon="⏳",
     layout="wide",
     initial_sidebar_state="collapsed"
@@ -36,7 +29,7 @@ def get_author_password() -> str:
             return str(st.secrets["AUTHOR_PASSWORD"])
     except Exception:
         pass
-    return "fika6002."
+    return "lebis9791."
 
 
 DEFAULT_PASSWORD = get_author_password()
@@ -70,34 +63,29 @@ def temizle_veritabani_kalintilari(conn: sqlite3.Connection):
     """Mevcut SQLite kayıtlarındaki kalıntı HTML etiketlerini kalıcı olarak temizler."""
     c = conn.cursor()
 
-    c.execute("SELECT id, baslik_tr, baslik_en, icerik_tr, icerik_en, yonlendirme_etiket_tr, yonlendirme_etiket_en FROM yazilar")
+    c.execute("SELECT id, baslik_tr, icerik_tr, yonlendirme_etiket_tr FROM yazilar")
     for row in c.fetchall():
-        y_id, b_tr, b_en, i_tr, i_en, et_tr, et_en = row
+        y_id, b_tr, i_tr, et_tr = row
         nb_tr = temizle_eski_html_kalintisi(b_tr or "") or "Bilgi Notu"
-        nb_en = temizle_eski_html_kalintisi(b_en or "")
         ni_tr = temizle_eski_html_kalintisi(i_tr or "")
-        ni_en = temizle_eski_html_kalintisi(i_en or "")
         net_tr = temizle_eski_html_kalintisi(et_tr or "")
-        net_en = temizle_eski_html_kalintisi(et_en or "")
 
-        if (nb_tr, nb_en, ni_tr, ni_en, net_tr, net_en) != (b_tr or "", b_en or "", i_tr or "", i_en or "", et_tr or "", et_en or ""):
+        if (nb_tr, ni_tr, net_tr) != (b_tr or "", i_tr or "", et_tr or ""):
             c.execute('''
                 UPDATE yazilar
-                SET baslik_tr = ?, baslik_en = ?, icerik_tr = ?, icerik_en = ?,
-                    yonlendirme_etiket_tr = ?, yonlendirme_etiket_en = ?
+                SET baslik_tr = ?, icerik_tr = ?, yonlendirme_etiket_tr = ?
                 WHERE id = ?
-            ''', (nb_tr, nb_en, ni_tr, ni_en, net_tr, net_en, y_id))
+            ''', (nb_tr, ni_tr, net_tr, y_id))
 
-    c.execute("SELECT id, metin_tr, metin_en FROM kayan_sozler")
-    for s_id, m_tr, m_en in c.fetchall():
+    c.execute("SELECT id, metin_tr FROM kayan_sozler")
+    for s_id, m_tr in c.fetchall():
         nm_tr = temizle_eski_html_kalintisi(m_tr or "")
-        nm_en = temizle_eski_html_kalintisi(m_en or "")
-        if (nm_tr, nm_en) != (m_tr or "", m_en or ""):
+        if nm_tr != (m_tr or ""):
             c.execute('''
                 UPDATE kayan_sozler
-                SET metin_tr = ?, metin_en = ?
+                SET metin_tr = ?
                 WHERE id = ?
-            ''', (nm_tr, nm_en, s_id))
+            ''', (nm_tr, s_id))
 
     conn.commit()
 
@@ -111,7 +99,6 @@ def init_db():
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             kategori TEXT,
             metin_tr TEXT,
-            metin_en TEXT,
             kaynak TEXT
         )
     ''')
@@ -120,13 +107,10 @@ def init_db():
         CREATE TABLE IF NOT EXISTS yazilar (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             baslik_tr TEXT,
-            baslik_en TEXT,
             icerik_tr TEXT,
-            icerik_en TEXT,
             kaynak TEXT,
             yonlendirme_url TEXT,
             yonlendirme_etiket_tr TEXT,
-            yonlendirme_etiket_en TEXT,
             tarih TEXT
         )
     ''')
@@ -138,36 +122,31 @@ def init_db():
             (
                 "Ayet / Hadis / Hikmet",
                 "İnsan için ancak çalıştığının karşılığı vardır.",
-                "And that there is not for man except that [good] for which he strives.",
                 "Necm Suresi, 39. Ayet"
             ),
             (
                 "Vatan, Millet ve Bayrak",
                 "Birlik ve beraberlik; ölümden başka her şeyi yener.",
-                "Unity and solidarity conquer everything except death.",
                 "Tarihi Devlet Hikmeti"
             ),
             (
                 "Osmanlı Padişahları",
                 "Halk içinde muteber bir nesne yok devlet gibi; olmaya devlet cihanda bir nefes sıhhat gibi.",
-                "There is no object of esteem among people like the state; yet no state in the world equals a single breath of health.",
                 "Kanuni Sultan Süleyman (Muhibbi)"
             ),
             (
                 "Veli Kulların Görüşleri",
                 "İlim ilim bilmektir, ilim kendin bilmektir; sen kendini bilmezsin, ya nice okumaktır.",
-                "Knowledge is to know knowledge, knowledge is to know oneself; if you do not know yourself, what is the use of reading?",
                 "Yunus Emre"
             ),
             (
                 "Osmanlı Padişahları",
                 "İnsanı yaşat ki devlet yaşasın.",
-                "Let the human live so that the state may live.",
                 "Şeyh Edebali'nin Osman Gazi'ye Nasihati"
             )
         ]
         c.executemany(
-            "INSERT INTO kayan_sozler (kategori, metin_tr, metin_en, kaynak) VALUES (?, ?, ?, ?)",
+            "INSERT INTO kayan_sozler (kategori, metin_tr, kaynak) VALUES (?, ?, ?)",
             ornek_sozler
         )
         conn.commit()
@@ -176,16 +155,13 @@ def init_db():
     if c.fetchone()[0] == 0:
         c.execute('''
             INSERT INTO yazilar (
-                baslik_tr, baslik_en, icerik_tr, icerik_en, kaynak,
-                yonlendirme_url, yonlendirme_etiket_tr, yonlendirme_etiket_en, tarih
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                baslik_tr, icerik_tr, kaynak,
+                yonlendirme_url, yonlendirme_etiket_tr, tarih
+            ) VALUES (?, ?, ?, ?, ?, ?)
         ''', (
             "Zamanın Kıymeti, Birlik Ruhu ve İlim Paylaşımı",
-            "The Value of Time, Spirit of Unity, and Sharing Knowledge",
             "Ömür, akıp giden bir kum saati gibidir. Her bir tanesi geri döndürülemez bir nefesi temsil eder. Vatanımıza, bayrağımıza, birlik ve beraberliğimize sahip çıkmak; ilmi, hikmeti ve güzel ahlakı yaymak en yüce vazifemizdir. Geçmişten aldığımız manevi mirası, doğruluk ve adalet ekseninde geleceğe taşımalıyız.",
-            "Life is like a flowing hourglass. Each grain represents an irreversible breath. Protecting our homeland, our flag, our unity and solidarity; spreading knowledge, wisdom, and good morals is our highest duty. We must carry the spiritual heritage we received from the past into the future on the axis of truth and justice.",
             "Kültür ve Hikmet Derlemeleri",
-            "",
             "",
             "",
             datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
@@ -199,177 +175,81 @@ def init_db():
 conn = init_db()
 
 # ---------------------------------------------------------
-# 3. OTOMATİK ÇEVİRİ YARDIMCI FONKSİYONU
+# 3. OTURUM DURUMLARI (YAZAR GİRİŞİ VE DÜZENLEME)
 # ---------------------------------------------------------
-def cevir_tr_to_en(metin: str) -> str:
-    if not metin or not metin.strip():
-        return ""
-    if not HAS_TRANSLATOR:
-        return metin
-    try:
-        parcalar = [metin[i:i+4500] for i in range(0, len(metin), 4500)]
-        cevrilmis_parcalar = [
-            GoogleTranslator(source='tr', target='en').translate(p) for p in parcalar
-        ]
-        return " ".join(cevrilmis_parcalar)
-    except Exception:
-        return metin
-
-
-# ---------------------------------------------------------
-# 4. OTURUM DURUMLARI (DİL, YAZAR GİRİŞİ, DÜZENLEME VE ÇEVİRİ)
-# ---------------------------------------------------------
-if "lang" not in st.session_state:
-    st.session_state.lang = "TR"
 if "is_author" not in st.session_state:
     st.session_state.is_author = False
 if "edit_post_id" not in st.session_state:
     st.session_state.edit_post_id = None
 if "edit_ticker_id" not in st.session_state:
     st.session_state.edit_ticker_id = None
-if "translated_posts" not in st.session_state:
-    st.session_state.translated_posts = {}
 
 # ---------------------------------------------------------
-# 5. ARAYÜZ SÖZLÜĞÜ (TAM ÇİFT DİL DESTEĞİ)
+# 4. ARAYÜZ METİNLERİ (TEK DİL: TÜRKÇE)
 # ---------------------------------------------------------
-UI_TEXT = {
-    "TR": {
-        "site_title": "MİLLİ VE MANEVİ HİKMET KÖŞESİ",
-        "site_subtitle": "Vatan, Millet, Bayrak, Birlik ve İlim Paylaşım Platformu",
-        "hourglass_caption": "Ömür sermayesi hızla akıyor; her anı hayırla ve ilimle değerlendirelim.",
-        "author_login_btn": "🔐 Misafir Yazar Girişi",
-        "author_logout_btn": "🚪 Yazar Çıkışı Yap",
-        "login_header": "Yetkili Misafir Yazar Girişi",
-        "password_label": "Yazar Erişim Şifresi:",
-        "login_submit": "Giriş Yap",
-        "login_success": "Yazar yetkisi doğrulandı. Kopyalama/yapıştırma ve içerik düzenleme aktif.",
-        "login_error": "Hatalı şifre! Yetkisiz erişim engellendi.",
-        "author_panel_title": "✍️ Yazar İçerik Yönetim Paneli (Serbest Kopyala / Yapıştır Aktif)",
-        "tab_new_post": "📝 Yeni Bilgi Notu / Makale Paylaş",
-        "tab_new_ticker": "📢 Üst Kayan Şeride Yeni Söz Ekle",
-        "tab_manage": "🗂️ Mevcut İçerikleri Güncelle / Sil",
-        "post_title_label": "Yazı Başlığı (Türkçe):",
-        "post_content_label": "Bilgi Notu / Hikmetli Yazı (Büyük Kapasiteli Alan - İstediğiniz kadar metin yapıştırabilirsiniz):",
-        "post_source_label": "Kaynak Belirtiniz (Zorunlu - Ayet, Hadis, Padişah, Eser veya Yazar):",
-        "post_url_label": "Harici Site Yönlendirme Bağlantısı (İsteğe Bağlı - Örn: https://...):",
-        "post_url_text_label": "Yönlendirme Butonu Açıklaması (İsteğe Bağlı - Örn: İlgili Kaynak Siteye Git):",
-        "auto_translate_info": "Not: Paylaş dediğinizde yazınız otomatik olarak İngilizceye de çevrilerek kaydedilir. Dilerseniz aşağıdan İngilizce metni manuel düzenleyebilirsiniz.",
-        "manual_en_check": "İngilizce çeviriyi manuel girmek / düzenlemek istiyorum",
-        "post_title_en_label": "Yazı Başlığı (İngilizce - Opsiyonel):",
-        "post_content_en_label": "Bilgi Notu (İngilizce - Opsiyonel):",
-        "publish_btn": "🚀 Yayına Al",
-        "publish_success": "Bilgi notu başarıyla yayınlandı!",
-        "source_warning": "Lütfen kaynak belirtiniz. Kaynaksız paylaşım yapılamaz.",
-        "ticker_cat_label": "Konu Kategorisi:",
-        "ticker_cats": [
-            "Vatan, Millet ve Bayrak",
-            "Birlik ve Beraberlik",
-            "Ayet / Hadis / Hikmet",
-            "Veli Kulların Görüşleri",
-            "Osmanlı Padişahları"
-        ],
-        "ticker_text_label": "Kayan Şerit Sözü (Türkçe):",
-        "ticker_source_label": "Sözün Kaynağı (Zorunlu):",
-        "ticker_add_btn": "➕ Kayan Şeride Ekle",
-        "ticker_success": "Söz üst kayan şeride eklendi!",
-        "posts_section_header": "📜 PAYLAŞILAN BİLGİ NOTLARI VE HİKMETLER",
-        "source_prefix": "Kaynak:",
-        "date_prefix": "Yayın Tarihi:",
-        "visit_link_default": "🔗 Yazarın Önerdiği Bağlantıya Git",
-        "no_posts": "Henüz paylaşılmış bir bilgi notu bulunmamaktadır.",
-        "translate_btn": "🌐 İngilizceye Çevir",
-        "show_tr_btn": "🇹🇷 Türkçe Metni Göster",
-        "translated_badge": "🇬🇧 İngilizce Çeviri Gösteriliyor",
-        "edit_btn": "✏️ Güncelle",
-        "delete_btn": "🗑️ Sil",
-        "delete_all_posts_btn": "💣 Tüm Bilgi Notlarını Veritabanından Sil",
-        "delete_all_tickers_btn": "💣 Tüm Kayan Sözleri Veritabanından Sil",
-        "confirm_delete_all": "Tüm kayıtların veritabanından kalıcı olarak silineceğini onaylıyorum",
-        "confirm_warning": "Önce yukarıdaki kalıcı silme onay kutusunu işaretleyin.",
-        "all_deleted_msg": "Seçili tüm veriler veritabanından kalıcı olarak silindi.",
-        "updated_msg": "Kayıt güncellendi.",
-        "deleted_msg": "Kayıt veritabanından silindi.",
-        "legal_title": "⚖️ HUKUKİ KORUMA VE YASAL UYARI",
-        "legal_text": (
-            "1. Bu platform yalnızca bilgi paylaşımı yapmak, milli ve manevi duyguları geliştirmek amacıyla oluşturulmuştur.\n"
-            "2. Sitede yer alan tüm bilgi notları, derlemeler ve tasarımlar Fikir ve Sanat Eserleri Kanunu kapsamında hukuki koruma altındadır.\n"
-            "3. İçeriklerin izinsiz kopyalanması, çoğaltılması, başka mecralarda yayınlanması ve ticari amaçla kullanılması kesinlikle yasaktır. Ticareti yapılamaz.\n"
-            "4. Her hakkı saklıdır. Kaynak gösterilmeden alıntı yapılamaz."
-        ),
-        "protection_badge": "🛡️ Kopyalama Koruması Aktif (Salt Okunur Ziyaretçi Modu)"
-    },
-    "EN": {
-        "site_title": "NATIONAL & SPIRITUAL WISDOM CORNER",
-        "site_subtitle": "Homeland, Nation, Flag, Unity, and Knowledge Sharing Platform",
-        "hourglass_caption": "The capital of life flows rapidly; let us value every moment with goodness and knowledge.",
-        "author_login_btn": "🔐 Guest Author Login",
-        "author_logout_btn": "🚪 Author Logout",
-        "login_header": "Authorized Guest Author Login",
-        "password_label": "Author Access Password:",
-        "login_submit": "Sign In",
-        "login_success": "Author credentials verified. Copy/paste and content management enabled.",
-        "login_error": "Incorrect password! Unauthorized access denied.",
-        "author_panel_title": "✍️ Author Content Management Panel (Free Copy / Paste Active)",
-        "tab_new_post": "📝 Publish New Knowledge Note / Article",
-        "tab_new_ticker": "📢 Add New Quote to Top Scrolling Banner",
-        "tab_manage": "🗂️ Update / Delete Existing Content",
-        "post_title_label": "Article Title (Turkish):",
-        "post_content_label": "Knowledge Note / Wisdom Article (High-Capacity Area - Paste as much text as needed):",
-        "post_source_label": "Specify Source (Mandatory - Verse, Hadith, Sultan, Work, or Author):",
-        "post_url_label": "External Website Redirection Link (Optional - e.g., https://...):",
-        "post_url_text_label": "Redirection Button Label (Optional - e.g., Visit Reference Website):",
-        "auto_translate_info": "Note: When you click Publish, your text is automatically translated into English and saved. You may also edit the English text manually below.",
-        "manual_en_check": "I want to enter / edit the English translation manually",
-        "post_title_en_label": "Article Title (English - Optional):",
-        "post_content_en_label": "Knowledge Note (English - Optional):",
-        "publish_btn": "🚀 Publish Now",
-        "publish_success": "Knowledge note published successfully!",
-        "source_warning": "Please specify a source. Publishing without a source is not permitted.",
-        "ticker_cat_label": "Topic Category:",
-        "ticker_cats": [
-            "Homeland, Nation & Flag",
-            "Unity & Solidarity",
-            "Quranic Verse / Hadith / Wisdom",
-            "Views of Saints & Scholars",
-            "Ottoman Sultans"
-        ],
-        "ticker_text_label": "Scrolling Banner Quote (Turkish):",
-        "ticker_source_label": "Source of the Quote (Mandatory):",
-        "ticker_add_btn": "➕ Add to Scrolling Banner",
-        "ticker_success": "Quote added to the top scrolling banner!",
-        "posts_section_header": "📜 SHARED KNOWLEDGE NOTES AND WISDOM",
-        "source_prefix": "Source:",
-        "date_prefix": "Published Date:",
-        "visit_link_default": "🔗 Visit Author's Recommended Link",
-        "no_posts": "No knowledge notes have been shared yet.",
-        "translate_btn": "🌐 Translate to English",
-        "show_tr_btn": "🇹🇷 Show Turkish Text",
-        "translated_badge": "🇬🇧 Showing English Translation",
-        "edit_btn": "✏️ Update",
-        "delete_btn": "🗑️ Delete",
-        "delete_all_posts_btn": "💣 Delete All Knowledge Notes from DB",
-        "delete_all_tickers_btn": "💣 Delete All Banner Quotes from DB",
-        "confirm_delete_all": "I confirm permanently deleting all selected records from the database",
-        "confirm_warning": "Please check the permanent deletion confirmation box above first.",
-        "all_deleted_msg": "All selected data permanently deleted from the database.",
-        "updated_msg": "Record updated.",
-        "deleted_msg": "Record deleted from database.",
-        "legal_title": "⚖️ LEGAL PROTECTION AND DISCLAIMER",
-        "legal_text": (
-            "1. This platform has been created solely for sharing knowledge and nurturing national and spiritual values.\n"
-            "2. All knowledge notes, compilations, and designs on this site are under legal protection pursuant to Intellectual and Artistic Works Law.\n"
-            "3. Unauthorized copying, reproduction, republication on other platforms, and commercial use of the content are strictly prohibited. It cannot be traded or commercialized.\n"
-            "4. All rights reserved. No quotation may be made without citing the source."
-        ),
-        "protection_badge": "🛡️ Copy Protection Active (Read-Only Visitor Mode)"
-    }
+T = {
+    "site_title": "MİLLİ VE MANEVİ HİKMET KÖŞESİ",
+    "site_subtitle": "Vatan, Millet, Bayrak, Birlik ve İlim Paylaşım Platformu",
+    "hourglass_caption": "Ömür sermayesi hızla akıyor; her anı hayırla ve ilimle değerlendirelim.",
+    "author_login_btn": "🔐 Misafir Yazar Girişi",
+    "author_logout_btn": "🚪 Yazar Çıkışı Yap",
+    "login_header": "Yetkili Misafir Yazar Girişi",
+    "password_label": "Yazar Erişim Şifresi:",
+    "login_submit": "Giriş Yap",
+    "login_success": "Yazar yetkisi doğrulandı. Kopyalama/yapıştırma ve içerik düzenleme aktif.",
+    "login_error": "Hatalı şifre! Yetkisiz erişim engellendi.",
+    "author_panel_title": "✍️ Yazar İçerik Yönetim Paneli (Serbest Kopyala / Yapıştır Aktif)",
+    "tab_new_post": "📝 Yeni Bilgi Notu / Makale Paylaş",
+    "tab_new_ticker": "📢 Üst Kayan Şeride Yeni Söz Ekle",
+    "tab_manage": "🗂️ Mevcut İçerikleri Güncelle / Sil",
+    "post_title_label": "Yazı Başlığı:",
+    "post_content_label": "Bilgi Notu / Hikmetli Yazı (Büyük Kapasiteli Alan - İstediğiniz kadar metin yapıştırabilirsiniz):",
+    "post_source_label": "Kaynak Belirtiniz (Zorunlu - Ayet, Hadis, Padişah, Eser veya Yazar):",
+    "post_url_label": "Harici Site Yönlendirme Bağlantısı (İsteğe Bağlı - Örn: https://...):",
+    "post_url_text_label": "Yönlendirme Butonu Açıklaması (İsteğe Bağlı - Örn: İlgili Kaynak Siteye Git):",
+    "publish_btn": "🚀 Yayına Al",
+    "publish_success": "Bilgi notu başarıyla yayınlandı!",
+    "source_warning": "Lütfen kaynak belirtiniz. Kaynaksız paylaşım yapılamaz.",
+    "ticker_cat_label": "Konu Kategorisi:",
+    "ticker_cats": [
+        "Vatan, Millet ve Bayrak",
+        "Birlik ve Beraberlik",
+        "Ayet / Hadis / Hikmet",
+        "Veli Kulların Görüşleri",
+        "Osmanlı Padişahları"
+    ],
+    "ticker_text_label": "Kayan Şerit Sözü:",
+    "ticker_source_label": "Sözün Kaynağı (Zorunlu):",
+    "ticker_add_btn": "➕ Kayan Şeride Ekle",
+    "ticker_success": "Söz üst kayan şeride eklendi!",
+    "posts_section_header": "📜 PAYLAŞILAN BİLGİ NOTLARI VE HİKMETLER",
+    "source_prefix": "Kaynak:",
+    "date_prefix": "Yayın Tarihi:",
+    "visit_link_default": "🔗 Yazarın Önerdiği Bağlantıya Git",
+    "no_posts": "Henüz paylaşılmış bir bilgi notu bulunmamaktadır.",
+    "edit_btn": "✏️ Güncelle",
+    "delete_btn": "🗑️ Sil",
+    "delete_all_posts_btn": "💣 Tüm Bilgi Notlarını Veritabanından Sil",
+    "delete_all_tickers_btn": "💣 Tüm Kayan Sözleri Veritabanından Sil",
+    "confirm_delete_all": "Tüm kayıtların veritabanından kalıcı olarak silineceğini onaylıyorum",
+    "confirm_warning": "Önce yukarıdaki kalıcı silme onay kutusunu işaretleyin.",
+    "all_deleted_msg": "Seçili tüm veriler veritabanından kalıcı olarak silindi.",
+    "updated_msg": "Kayıt güncellendi.",
+    "deleted_msg": "Kayıt veritabanından silindi.",
+    "legal_title": "⚖️ HUKUKİ KORUMA VE YASAL UYARI",
+    "legal_text": (
+        "1. Bu platform yalnızca bilgi paylaşımı yapmak, milli ve manevi duyguları geliştirmek amacıyla oluşturulmuştur.\n"
+        "2. Sitede yer alan tüm bilgi notları, derlemeler ve tasarımlar Fikir ve Sanat Eserleri Kanunu kapsamında hukuki koruma altındadır.\n"
+        "3. İçeriklerin izinsiz kopyalanması, çoğaltılması, başka mecralarda yayınlanması ve ticari amaçla kullanılması kesinlikle yasaktır. Ticareti yapılamaz.\n"
+        "4. Her hakkı saklıdır. Kaynak gösterilmeden alıntı yapılamaz.\n"
+        "5. Yazılımda yer alan ayet, hadis ve âlim görüşlerine ilişkin çeviriler (otomatik veya yapay zekâ destekli çeviriler dahil) kolaylık ve genel bilgilendirme amacıyla sunulmaktadır. Kavram incelikleri, bağlam ve yorum farkları nedeniyle çevirilerde anlam kayması oluşabilir; bu çeviriler tek başına kesin veya bağlayıcı kaynak yerine geçmez ve asıl metinlerin, muteber meallerin ile ilgili kaynak eserlerin esas alınması gerekir.\n"
+        "6. Yazılımdaki metin ve kaynak atıfları yapay zekâ desteğiyle oluşturulmuş olabilir; yalnızca bilgilendirme amaçlıdır ve resmî, teknik, idari, mali veya hukuki görüş/onay yerine geçmez. Yapay zekâ sistemleri eksik, güncel olmayan veya hatalı bilgi ve kaynak üretebileceğinden, tüm içerik ve atıfların kullanılmadan önce birincil kaynaklardan teyit edilmesi kullanıcının sorumluluğundadır.\n"
+        "7. Yazılım \"olduğu gibi\" (AS-IS) sunulur; doğrulanmamış içeriklerin kullanımından doğabilecek zararlardan geliştirici ve dağıtıcı sorumlu tutulamaz."
+    ),
+    "protection_badge": "🛡️ Kopyalama Koruması Aktif (Salt Okunur Ziyaretçi Modu)"
 }
-
-T = UI_TEXT[st.session_state.lang]
-
 # ---------------------------------------------------------
-# KENAR ÇUBUĞU (SIDEBAR): UYKU MODU BİLGİSİ VE YENİLEME
+# 5. KENAR ÇUBUĞU (SIDEBAR): UYKU MODU BİLGİSİ VE YENİLEME
 # ---------------------------------------------------------
 st.sidebar.markdown("---")
 st.sidebar.info(
@@ -386,7 +266,7 @@ if st.sidebar.button("🔄 Sayfayı Yenile", use_container_width=True):
     st.rerun()
 
 # ---------------------------------------------------------
-# 6. GÖZ YORMAYAN TASARIM, KUM SAATİ VE KOPYALAMA KORUMASI (CSS + JS)
+# 6. TASARIM, KUM SAATİ VE KOPYALAMA KORUMASI (CSS + JS)
 # ---------------------------------------------------------
 if not st.session_state.is_author:
     anti_copy_css = """
@@ -432,7 +312,6 @@ st.markdown(
     unsafe_allow_html=True
 )
 
-# Ziyaretçiler için JavaScript Sağ Tık, Kopyalama, Kesme ve Kısayol (Ctrl+C, Ctrl+U, Ctrl+S, F12) Engeli
 if not st.session_state.is_author:
     components.html(
         """
@@ -469,9 +348,9 @@ if not st.session_state.is_author:
     )
 
 # ---------------------------------------------------------
-# 7. ÜST KONTROL ÇUBUĞU (DİL SEÇİMİ VE YAZAR GİRİŞİ)
+# 7. ÜST KONTROL ÇUBUĞU (YAZAR GİRİŞİ)
 # ---------------------------------------------------------
-top_col1, top_col2, top_col3 = st.columns([5, 2, 2])
+top_col1, top_col2 = st.columns([7, 2])
 
 with top_col1:
     st.caption(
@@ -481,19 +360,6 @@ with top_col1:
     )
 
 with top_col2:
-    lang_choice = st.radio(
-        "Dil / Language",
-        options=["TR", "EN"],
-        format_func=lambda x: "🇹🇷 Türkçe" if x == "TR" else "🇬🇧 English",
-        horizontal=True,
-        label_visibility="collapsed",
-        index=0 if st.session_state.lang == "TR" else 1
-    )
-    if lang_choice != st.session_state.lang:
-        st.session_state.lang = lang_choice
-        st.rerun()
-
-with top_col3:
     if not st.session_state.is_author:
         with st.popover(T["author_login_btn"], use_container_width=True):
             st.subheader(T["login_header"])
@@ -516,14 +382,13 @@ with top_col3:
 # 8. EN ÜSTTE BÜYÜK SİYAH PUNTOLU HIZLI KAYAN SÖZLER ŞERİDİ
 # ---------------------------------------------------------
 c = conn.cursor()
-c.execute("SELECT kategori, metin_tr, metin_en, kaynak FROM kayan_sozler ORDER BY id DESC")
+c.execute("SELECT kategori, metin_tr, kaynak FROM kayan_sozler ORDER BY id DESC")
 ticker_rows = c.fetchall()
 
 ticker_items_html = ""
 for row in ticker_rows:
-    kat, m_tr, m_en, kynk = row
-    gosterilecek_soz = m_tr if st.session_state.lang == "TR" else (m_en if m_en else m_tr)
-    soz_e = html.escape(temizle_eski_html_kalintisi(gosterilecek_soz or ""))
+    kat, m_tr, kynk = row
+    soz_e = html.escape(temizle_eski_html_kalintisi(m_tr or ""))
     kynk_e = html.escape(temizle_eski_html_kalintisi(kynk or ""))
     ticker_items_html += f'<span>“{soz_e}” </span><span class="ticker-source">[{kynk_e}] &nbsp;&nbsp;✦&nbsp;&nbsp; </span>'
 
@@ -555,7 +420,6 @@ with head_col2:
     )
 
 st.markdown("---")
-
 # ---------------------------------------------------------
 # 10. YAZAR YÖNETİM PANELİ (EKLEME, GÜNCELLEME VE KALICI SİLME)
 # ---------------------------------------------------------
@@ -583,11 +447,6 @@ if st.session_state.is_author:
                     placeholder="İlgili Siteye Gitmek İçin Tıklayınız"
                 )
 
-            st.info(T["auto_translate_info"])
-            manuel_en = st.checkbox(T["manual_en_check"])
-            baslik_en_manuel = st.text_input(T["post_title_en_label"]) if manuel_en else ""
-            icerik_en_manuel = st.text_area(T["post_content_en_label"], height=200) if manuel_en else ""
-
             submitted = st.form_submit_button(T["publish_btn"], type="primary")
             if submitted:
                 if not kaynak_yazi.strip():
@@ -595,33 +454,21 @@ if st.session_state.is_author:
                 elif not icerik_tr.strip():
                     st.warning("Lütfen içerik metnini giriniz.")
                 else:
-                    with st.spinner("İçerik kaydediliyor ve İngilizce çevirisi hazırlanıyor..."):
+                    with st.spinner("İçerik kaydediliyor..."):
                         clean_b_tr = temizle_eski_html_kalintisi(baslik_tr)
                         clean_i_tr = temizle_eski_html_kalintisi(icerik_tr)
                         final_baslik_tr = clean_b_tr if clean_b_tr else "Bilgi Notu"
-                        final_baslik_en = (
-                            temizle_eski_html_kalintisi(baslik_en_manuel)
-                            if (manuel_en and baslik_en_manuel.strip())
-                            else cevir_tr_to_en(final_baslik_tr)
-                        )
-                        final_icerik_en = (
-                            temizle_eski_html_kalintisi(icerik_en_manuel)
-                            if (manuel_en and icerik_en_manuel.strip())
-                            else cevir_tr_to_en(clean_i_tr)
-                        )
-
                         etiket_tr = temizle_eski_html_kalintisi(yonlendirme_etiket_tr)
-                        etiket_en = cevir_tr_to_en(etiket_tr) if etiket_tr else ""
                         tarih_str = datetime.datetime.now().strftime("%d.%m.%Y %H:%M")
 
                         c.execute('''
                             INSERT INTO yazilar (
-                                baslik_tr, baslik_en, icerik_tr, icerik_en, kaynak,
-                                yonlendirme_url, yonlendirme_etiket_tr, yonlendirme_etiket_en, tarih
-                            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                                baslik_tr, icerik_tr, kaynak,
+                                yonlendirme_url, yonlendirme_etiket_tr, tarih
+                            ) VALUES (?, ?, ?, ?, ?, ?)
                         ''', (
-                            final_baslik_tr, final_baslik_en, clean_i_tr, final_icerik_en,
-                            kaynak_yazi.strip(), yonlendirme_url.strip(), etiket_tr, etiket_en, tarih_str
+                            final_baslik_tr, clean_i_tr,
+                            kaynak_yazi.strip(), yonlendirme_url.strip(), etiket_tr, tarih_str
                         ))
                         conn.commit()
                     st.toast(T["publish_success"])
@@ -639,12 +486,11 @@ if st.session_state.is_author:
                 if not soz_kaynak.strip() or not soz_tr.strip():
                     st.warning(T["source_warning"])
                 else:
-                    with st.spinner("Çevriliyor ve kayan şeride ekleniyor..."):
+                    with st.spinner("Kayan şeride ekleniyor..."):
                         clean_soz_tr = temizle_eski_html_kalintisi(soz_tr)
-                        soz_en = cevir_tr_to_en(clean_soz_tr)
                         c.execute(
-                            "INSERT INTO kayan_sozler (kategori, metin_tr, metin_en, kaynak) VALUES (?, ?, ?, ?)",
-                            (kat_secim, clean_soz_tr, soz_en, soz_kaynak.strip())
+                            "INSERT INTO kayan_sozler (kategori, metin_tr, kaynak) VALUES (?, ?, ?)",
+                            (kat_secim, clean_soz_tr, soz_kaynak.strip())
                         )
                         conn.commit()
                     st.toast(T["ticker_success"])
@@ -654,11 +500,11 @@ if st.session_state.is_author:
     with tab3:
         st.subheader("Paylaşılan Bilgi Notları")
         c.execute("""
-            SELECT id, baslik_tr, baslik_en, icerik_tr, icerik_en, kaynak,
-                   yonlendirme_url, yonlendirme_etiket_tr, yonlendirme_etiket_en, tarih
+            SELECT id, baslik_tr, icerik_tr, kaynak,
+                   yonlendirme_url, yonlendirme_etiket_tr, tarih
             FROM yazilar ORDER BY id DESC
         """)
-        for y_id, y_b_tr, y_b_en, y_i_tr, y_i_en, y_kaynak, y_url, y_et_tr, y_et_en, y_tarih in c.fetchall():
+        for y_id, y_b_tr, y_i_tr, y_kaynak, y_url, y_et_tr, y_tarih in c.fetchall():
             col_m1, col_m2, col_m3 = st.columns([5, 1, 1])
             gosterim_baslik = temizle_eski_html_kalintisi(y_b_tr)
             col_m1.write(f"**{gosterim_baslik}** — *{y_kaynak}* ({y_tarih})")
@@ -668,7 +514,6 @@ if st.session_state.is_author:
             if col_m3.button(T["delete_btn"], key=f"tab_del_post_{y_id}"):
                 c.execute("DELETE FROM yazilar WHERE id = ?", (y_id,))
                 conn.commit()
-                st.session_state.translated_posts.pop(y_id, None)
                 if st.session_state.edit_post_id == y_id:
                     st.session_state.edit_post_id = None
                 st.toast(T["deleted_msg"])
@@ -676,23 +521,20 @@ if st.session_state.is_author:
 
         if st.session_state.edit_post_id is not None:
             c.execute("""
-                SELECT id, baslik_tr, baslik_en, icerik_tr, icerik_en, kaynak,
-                       yonlendirme_url, yonlendirme_etiket_tr, yonlendirme_etiket_en
+                SELECT id, baslik_tr, icerik_tr, kaynak,
+                       yonlendirme_url, yonlendirme_etiket_tr
                 FROM yazilar WHERE id = ?
             """, (st.session_state.edit_post_id,))
             target_post = c.fetchone()
             if target_post:
-                _, eb_tr, eb_en, ei_tr, ei_en, ekynk, eurl, eet_tr, eet_en = target_post
+                _, eb_tr, ei_tr, ekynk, eurl, eet_tr = target_post
                 st.markdown("#### ✏️ Bilgi Notunu Güncelle")
                 with st.form(f"guncelle_yazi_formu_{st.session_state.edit_post_id}"):
-                    new_b_tr = st.text_input("Başlık (TR)", value=temizle_eski_html_kalintisi(eb_tr or ""))
-                    new_i_tr = st.text_area("İçerik (TR)", value=temizle_eski_html_kalintisi(ei_tr or ""), height=240)
+                    new_b_tr = st.text_input("Başlık", value=temizle_eski_html_kalintisi(eb_tr or ""))
+                    new_i_tr = st.text_area("İçerik", value=temizle_eski_html_kalintisi(ei_tr or ""), height=240)
                     new_kynk = st.text_input("Kaynak", value=ekynk or "")
                     new_url = st.text_input("Yönlendirme URL", value=eurl or "")
-                    new_et_tr = st.text_input("Buton Etiketi (TR)", value=temizle_eski_html_kalintisi(eet_tr or ""))
-                    retranslate_en = st.checkbox("İngilizce başlık/içerik/etiketi yeniden çevir", value=True)
-                    new_b_en = st.text_input("Başlık (EN)", value=temizle_eski_html_kalintisi(eb_en or ""))
-                    new_i_en = st.text_area("İçerik (EN)", value=temizle_eski_html_kalintisi(ei_en or ""), height=150)
+                    new_et_tr = st.text_input("Buton Etiketi", value=temizle_eski_html_kalintisi(eet_tr or ""))
 
                     c_save, c_cancel = st.columns(2)
                     save_upd = c_save.form_submit_button("💾 Değişiklikleri Kaydet", type="primary")
@@ -708,28 +550,18 @@ if st.session_state.is_author:
                                 final_b_tr = clean_nb_tr or "Bilgi Notu"
                                 final_i_tr = clean_ni_tr
                                 final_et_tr = temizle_eski_html_kalintisi(new_et_tr)
-                                if retranslate_en:
-                                    final_b_en = cevir_tr_to_en(final_b_tr)
-                                    final_i_en = cevir_tr_to_en(final_i_tr)
-                                    final_et_en = cevir_tr_to_en(final_et_tr) if final_et_tr else ""
-                                else:
-                                    final_b_en = temizle_eski_html_kalintisi(new_b_en) or eb_en
-                                    final_i_en = temizle_eski_html_kalintisi(new_i_en) or ei_en
-                                    final_et_en = eet_en
 
                                 c.execute('''
                                     UPDATE yazilar
-                                    SET baslik_tr = ?, baslik_en = ?, icerik_tr = ?, icerik_en = ?,
-                                        kaynak = ?, yonlendirme_url = ?, yonlendirme_etiket_tr = ?,
-                                        yonlendirme_etiket_en = ?
+                                    SET baslik_tr = ?, icerik_tr = ?, kaynak = ?,
+                                        yonlendirme_url = ?, yonlendirme_etiket_tr = ?
                                     WHERE id = ?
                                 ''', (
-                                    final_b_tr, final_b_en, final_i_tr, final_i_en,
-                                    new_kynk.strip(), new_url.strip(), final_et_tr, final_et_en,
+                                    final_b_tr, final_i_tr,
+                                    new_kynk.strip(), new_url.strip(), final_et_tr,
                                     st.session_state.edit_post_id
                                 ))
                                 conn.commit()
-                            st.session_state.translated_posts.pop(st.session_state.edit_post_id, None)
                             st.session_state.edit_post_id = None
                             st.toast(T["updated_msg"])
                             st.rerun()
@@ -740,8 +572,8 @@ if st.session_state.is_author:
 
         st.markdown("---")
         st.subheader("Kayan Şerit Sözleri")
-        c.execute("SELECT id, kategori, metin_tr, metin_en, kaynak FROM kayan_sozler ORDER BY id DESC")
-        for s_id, s_kat, s_metin, s_metin_en, s_kaynak in c.fetchall():
+        c.execute("SELECT id, kategori, metin_tr, kaynak FROM kayan_sozler ORDER BY id DESC")
+        for s_id, s_kat, s_metin, s_kaynak in c.fetchall():
             col_s1, col_s2, col_s3 = st.columns([5, 1, 1])
             clean_s_tr = temizle_eski_html_kalintisi(s_metin or "")
             col_s1.write(f"“{clean_s_tr[:90]}...” — *{s_kaynak}*")
@@ -757,18 +589,16 @@ if st.session_state.is_author:
                 st.rerun()
 
         if st.session_state.edit_ticker_id is not None:
-            c.execute("SELECT id, kategori, metin_tr, metin_en, kaynak FROM kayan_sozler WHERE id = ?", (st.session_state.edit_ticker_id,))
+            c.execute("SELECT id, kategori, metin_tr, kaynak FROM kayan_sozler WHERE id = ?", (st.session_state.edit_ticker_id,))
             target_ticker = c.fetchone()
             if target_ticker:
-                _, tk_kat, tk_tr, tk_en, tk_kynk = target_ticker
+                _, tk_kat, tk_tr, tk_kynk = target_ticker
                 st.markdown("#### ✏️ Kayan Şerit Sözünü Güncelle")
                 with st.form(f"guncelle_soz_formu_{st.session_state.edit_ticker_id}"):
                     kat_idx = T["ticker_cats"].index(tk_kat) if tk_kat in T["ticker_cats"] else 0
                     new_tk_kat = st.selectbox(T["ticker_cat_label"], T["ticker_cats"], index=kat_idx)
                     new_tk_tr = st.text_area(T["ticker_text_label"], value=temizle_eski_html_kalintisi(tk_tr or ""), height=110)
                     new_tk_kynk = st.text_input(T["ticker_source_label"], value=tk_kynk or "")
-                    retrans_tk = st.checkbox("İngilizce çeviriyi yeniden oluştur", value=True)
-                    new_tk_en = st.text_area("Söz (EN)", value=temizle_eski_html_kalintisi(tk_en or ""), height=80)
 
                     sc1, sc2 = st.columns(2)
                     save_tk = sc1.form_submit_button("💾 Sözü Güncelle", type="primary")
@@ -779,12 +609,11 @@ if st.session_state.is_author:
                             st.warning(T["source_warning"])
                         else:
                             final_tk_tr = temizle_eski_html_kalintisi(new_tk_tr)
-                            final_tk_en = cevir_tr_to_en(final_tk_tr) if retrans_tk else (temizle_eski_html_kalintisi(new_tk_en) or tk_en)
                             c.execute('''
                                 UPDATE kayan_sozler
-                                SET kategori = ?, metin_tr = ?, metin_en = ?, kaynak = ?
+                                SET kategori = ?, metin_tr = ?, kaynak = ?
                                 WHERE id = ?
-                            ''', (new_tk_kat, final_tk_tr, final_tk_en, new_tk_kynk.strip(), st.session_state.edit_ticker_id))
+                            ''', (new_tk_kat, final_tk_tr, new_tk_kynk.strip(), st.session_state.edit_ticker_id))
                             conn.commit()
                             st.session_state.edit_ticker_id = None
                             st.toast(T["updated_msg"])
@@ -804,7 +633,6 @@ if st.session_state.is_author:
             else:
                 c.execute("DELETE FROM yazilar")
                 conn.commit()
-                st.session_state.translated_posts.clear()
                 st.session_state.edit_post_id = None
                 st.toast(T["all_deleted_msg"])
                 st.rerun()
@@ -822,13 +650,13 @@ if st.session_state.is_author:
     st.markdown("---")
 
 # ---------------------------------------------------------
-# 11. ANA İÇERİK AKIŞI (BİLGİ NOTLARI VE İSTEĞE BAĞLI ÇEVİRİ)
+# 11. ANA İÇERİK AKIŞI (BİLGİ NOTLARI)
 # ---------------------------------------------------------
 st.markdown(f"### {T['posts_section_header']}")
 
 c.execute("""
-    SELECT id, baslik_tr, baslik_en, icerik_tr, icerik_en, kaynak,
-           yonlendirme_url, yonlendirme_etiket_tr, yonlendirme_etiket_en, tarih
+    SELECT id, baslik_tr, icerik_tr, kaynak,
+           yonlendirme_url, yonlendirme_etiket_tr, tarih
     FROM yazilar ORDER BY id DESC
 """)
 posts = c.fetchall()
@@ -837,29 +665,11 @@ if not posts:
     st.info(T["no_posts"])
 else:
     for post in posts:
-        p_id, b_tr, b_en, i_tr, i_en, kynk, url, et_tr, et_en, trh = post
+        p_id, b_tr, i_tr, kynk, url, et_tr, trh = post
         b_tr_clean = temizle_eski_html_kalintisi(b_tr or "")
-        b_en_clean = temizle_eski_html_kalintisi(b_en or "")
         i_tr_clean = temizle_eski_html_kalintisi(i_tr or "")
-        i_en_clean = temizle_eski_html_kalintisi(i_en or "")
         et_tr_clean = temizle_eski_html_kalintisi(et_tr or "")
-        et_en_clean = temizle_eski_html_kalintisi(et_en or "")
-
-        active_en_view = p_id in st.session_state.translated_posts
-
-        if active_en_view:
-            cached_en = st.session_state.translated_posts[p_id]
-            g_baslik = temizle_eski_html_kalintisi(cached_en.get("baslik_en") or "") or b_en_clean or b_tr_clean
-            g_icerik = temizle_eski_html_kalintisi(cached_en.get("icerik_en") or "") or i_en_clean or i_tr_clean
-            g_etiket = temizle_eski_html_kalintisi(cached_en.get("etiket_en") or "") or et_en_clean or et_tr_clean or T["visit_link_default"]
-        elif st.session_state.lang == "EN":
-            g_baslik = b_en_clean if b_en_clean else b_tr_clean
-            g_icerik = i_en_clean if i_en_clean else i_tr_clean
-            g_etiket = et_en_clean if et_en_clean else (et_tr_clean if et_tr_clean else T["visit_link_default"])
-        else:
-            g_baslik = b_tr_clean
-            g_icerik = i_tr_clean
-            g_etiket = et_tr_clean if et_tr_clean else T["visit_link_default"]
+        g_etiket = et_tr_clean if et_tr_clean else T["visit_link_default"]
 
         link_html = ""
         if url and url.strip():
@@ -871,17 +681,10 @@ else:
                     f'class="redirect-btn">{html.escape(g_etiket)} ↗️</a>'
                 )
 
-        badge_html = (
-            f'<div style="font-size:13px; font-weight:700; color:#1E3A5F; margin-bottom:8px;">'
-            f'{html.escape(T["translated_badge"])}</div>'
-            if active_en_view else ""
-        )
-
         card_html = (
             f'<div class="wisdom-card">'
-            f'{badge_html}'
-            f'<div class="wisdom-title">{html.escape(g_baslik or "")}</div>'
-            f'<div class="wisdom-body">{html.escape(g_icerik or "")}</div>'
+            f'<div class="wisdom-title">{html.escape(b_tr_clean)}</div>'
+            f'<div class="wisdom-body">{html.escape(i_tr_clean)}</div>'
             f'<div class="wisdom-meta">'
             f'<span>📚 {html.escape(T["source_prefix"])} {html.escape(kynk or "")}</span>'
             f'<span>🗓️ {html.escape(T["date_prefix"])} {html.escape(trh or "")}</span>'
@@ -891,41 +694,14 @@ else:
         )
         st.markdown(card_html, unsafe_allow_html=True)
 
-        btn_cols = st.columns([2.2, 1.3, 1.3, 5.2] if st.session_state.is_author else [2.4, 7.6])
-
-        if not active_en_view:
-            if btn_cols[0].button(T["translate_btn"], key=f"tr_to_en_{p_id}"):
-                with st.spinner("İngilizceye çevriliyor..."):
-                    cev_baslik = cevir_tr_to_en(b_tr_clean) if b_tr_clean else ""
-                    cev_icerik = cevir_tr_to_en(i_tr_clean) if i_tr_clean else ""
-                    cev_etiket = cevir_tr_to_en(et_tr_clean) if et_tr_clean else ""
-
-                    c.execute('''
-                        UPDATE yazilar
-                        SET baslik_en = ?, icerik_en = ?, yonlendirme_etiket_en = ?
-                        WHERE id = ?
-                    ''', (cev_baslik, cev_icerik, cev_etiket, p_id))
-                    conn.commit()
-
-                    st.session_state.translated_posts[p_id] = {
-                        "baslik_en": cev_baslik,
-                        "icerik_en": cev_icerik,
-                        "etiket_en": cev_etiket,
-                    }
-                st.rerun()
-        else:
-            if btn_cols[0].button(T["show_tr_btn"], key=f"back_to_tr_{p_id}"):
-                st.session_state.translated_posts.pop(p_id, None)
-                st.rerun()
-
         if st.session_state.is_author:
-            if btn_cols[1].button(T["edit_btn"], key=f"card_edit_{p_id}"):
+            btn_cols = st.columns([1.3, 1.3, 7.4])
+            if btn_cols[0].button(T["edit_btn"], key=f"card_edit_{p_id}"):
                 st.session_state.edit_post_id = p_id
                 st.rerun()
-            if btn_cols[2].button(T["delete_btn"], key=f"card_del_{p_id}"):
+            if btn_cols[1].button(T["delete_btn"], key=f"card_del_{p_id}"):
                 c.execute("DELETE FROM yazilar WHERE id = ?", (p_id,))
                 conn.commit()
-                st.session_state.translated_posts.pop(p_id, None)
                 if st.session_state.edit_post_id == p_id:
                     st.session_state.edit_post_id = None
                 st.toast(T["deleted_msg"])
